@@ -10,9 +10,22 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && apt-get update -y && apt-get install curl -y \
     && mkdir -p /home/$USERNAME/hl/data && chown -R $USERNAME:$USERNAME /home/$USERNAME/hl
 
+
+RUN apt-get update && \
+  apt-get install -y nginx && \
+  chown -R $USERNAME:$USERNAME /var/lib/nginx && \
+  chown -R $USERNAME:$USERNAME /var/log/nginx && \
+  chmod a+w /run && \
+  echo "\ndaemon off;\nerror_log /dev/stdout info;" >> /etc/nginx/nginx.conf && \
+  sed -e "s/^.*access_log.*$/access_log \/dev\/stdout;/" /etc/nginx/nginx.conf
+
+
 USER $USERNAME
 
 WORKDIR /home/$USERNAME
+
+COPY hl-evm.conf /etc/nginx/sites-available/default
+COPY entrypoint.sh /entrypoint.sh
 
 # configure chain to testnet
 RUN echo '{"chain": "Testnet"}' > /home/$USERNAME/visor.json
@@ -26,9 +39,11 @@ ADD --chown=$USER_UID:$USER_GID https://binaries.hyperliquid.xyz/Testnet/non_val
 # add the binary
 ADD --chown=$USER_UID:$USER_GID --chmod=700 https://binaries.hyperliquid.xyz/Testnet/hl-visor /home/$USERNAME/hl-visor
 
+# evm rpc port
+EXPOSE 8001
 # gossip ports
 EXPOSE 4001
 EXPOSE 4002
 
-# run a non-validating node
-ENTRYPOINT $HOME/hl-visor run-non-validator
+# run a non-node
+CMD ["/entrypoint.sh"]
